@@ -30,7 +30,11 @@ ubuntu 14.04中安装docker的方式.
 其实际进行的操作就是修改`/etc/default/docker`文件,这个文件中设置的值会在使用
 
 	$ sudo service docker restart
-的时候放在`docker -d`的后面.
+
+这样实际启动的时候运行的命令就是
+
+
+	docker --registry-mirror=http://bf2350bc.m.daocloud.io -dD
 
 ## docker开发环境的建立
 docker的核心开发人员在开发docker的时候,使用了像编译器开发人员一样的模式,就是用一个
@@ -85,4 +89,53 @@ RUN echo "deb http://mirrors.aliyun.com/ubuntu/ trusty-backports main restricted
 就只能跳过一些步骤了.
 但是其中对golang的安装和docker源代码的下载是必须的,因为docker是使用go写的,而且我们是
 基于现在的源代码来修改docker的.
+
+2015年04月01日
+===
+
+首先,在一个terminal中,将当前的路径切换到我们的docker源文件所在的路径,我的是
+
+	cd /home/cxy/code/docker
+这个路径中的代码也就是和我在github上面的docker源代码同步的路径.
+
+运行
+
+	make
+在这个路径下面,有一个Makefile,docker使用make来完成生成镜像的工作,后面会仔细分析这个
+镜像的内容. 其在build的时候,使用的也是这个目录下面的Dockerfil文件. 完成之后,会生成一个
+`docker:master`的镜像
+
+	docker run --privileged --rm -ti -v `pwd`:/go/src/github.com/docker/docker docker:master /bin/bash
+
+这里也是使用了我们的my-test这个mirror来启动一个container,其中的
+
+	-v `pwd`:/go/src/github.com/docker/docker
+表示将我们本地的docker源文件目录挂载到容器中的`/go/src/github.com/docker/docker`,
+这样我们只需要改变本地的代码,在容器中就同步的更新了.
+
+进入容器之后,保证当前的目录是`/go/src/github.com/docker/docker`,也就是本地源代码
+映射过来的路径.
+
+	cp bundles/1.5.0-dev/binary/docker /usr/bin
+将上面make生成的docker执行文件放到PATH中,这样就可以直接运行了.
+
+	docker --registry-mirror=http://bf2350bc.m.daocloud.io -dD
+在这个容器中使用我们正在开发的docker建立一个daemon.
+
+在本地再打开一个终端,
+	
+	docker exec -ti xxx bash
+其中的xxx可以使用`docker ps`看到,其为docker:master对应的容器.
+这样就在另外一个终端中也进入了这个容器了.
+
+	docker run hello-world
+在正在开发的docker生成的容器中,运行hello-world这个用于测试的镜像,如果成功了,那么说明
+现在是可以使用的了.
+	
+>需要注意的是,在dcker:master这个镜像中,`/go/src/github.com/docker/docker`中本来也是有
+代码的,像这样挂载之后,里面的代码就看不到了.
+
+>注意,当我们修改Dockerfile的时候,最好能够做到增量式的修改,就是总是在最后的地方添加,
+这样就能保证下一次生成一个镜像的时候更多的使用前面已经使用过的缓存.
+
 
